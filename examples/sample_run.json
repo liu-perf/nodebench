@@ -1,0 +1,604 @@
+{
+  "node": {
+    "label": "EXAMPLE -- synthetic data, not a real machine",
+    "vendor": "",
+    "notes": "Every number below is fabricated to demonstrate the report layout."
+  },
+  "meta": {
+    "version": "0.1.0",
+    "started_at": "example",
+    "backend": "both"
+  },
+  "compat": {
+    "env": {
+      "host": {
+        "platform": "Linux-5.15.0-x86_64",
+        "python": "3.11.9",
+        "cpu_count": 64
+      },
+      "gpus": [
+        {
+          "index": 0,
+          "name": "NVIDIA GeForce RTX 5090",
+          "compute_cap": "12.0",
+          "driver": "570.86.16",
+          "memory_mib": 32607
+        },
+        {
+          "index": 1,
+          "name": "NVIDIA GeForce RTX 5090",
+          "compute_cap": "12.0",
+          "driver": "570.86.16",
+          "memory_mib": 32607
+        }
+      ],
+      "torch": {
+        "version": "2.7.0+cu128",
+        "cuda_available": true,
+        "cuda_built": "12.8",
+        "cudnn": 90800,
+        "device_count": 2,
+        "nccl_version": "2.26.2",
+        "arch_list": [
+          "sm_75",
+          "sm_80",
+          "sm_86",
+          "sm_90",
+          "sm_100",
+          "sm_120"
+        ]
+      },
+      "nvcc": "Cuda compilation tools, release 12.8, V12.8.61"
+    },
+    "findings": [
+      {
+        "level": "ok",
+        "title": "sm_120 present in this torch build",
+        "detail": "torch 2.7.0+cu128 contains a cubin for compute capability 12.0. No PTX JIT at first launch."
+      },
+      {
+        "level": "ok",
+        "title": "CUDA 12.8 is new enough for Blackwell",
+        "detail": "sm_120 requires CUDA 12.8 or later."
+      },
+      {
+        "level": "warn",
+        "title": "NCCL 2.26.2 on Blackwell",
+        "detail": "2.21 is the practical minimum on this architecture and newer is materially better. Worth checking whether a newer NCCL is available before treating the collective numbers as a ceiling."
+      }
+    ]
+  },
+  "topology": {
+    "devices": [
+      0,
+      1
+    ],
+    "matrix": {
+      "0": {
+        "0": "X",
+        "1": "PIX"
+      },
+      "1": {
+        "0": "PIX",
+        "1": "X"
+      }
+    },
+    "numa_groups": {
+      "group 0": [
+        0,
+        1
+      ]
+    },
+    "has_nvlink": false,
+    "is_multi_root": false,
+    "numa_source": "auto"
+  },
+  "host": {
+    "platform": "Linux",
+    "cpu": {
+      "model": "AMD EPYC 9554 64-Core Processor",
+      "sockets": 2,
+      "cores_per_socket": 64,
+      "threads_per_core": 2,
+      "logical_cpus": 256,
+      "numa_nodes": 2,
+      "numa_cpu_ranges": {
+        "node0": "0-63,128-191",
+        "node1": "64-127,192-255"
+      }
+    },
+    "memory": {
+      "total_gib": 1007.5,
+      "available_gib": 953.7
+    },
+    "pcie": {
+      "per_gpu": {
+        "0": {
+          "gen_max": 5,
+          "gen_current": 1,
+          "width_max": 16,
+          "width_current": 16,
+          "theoretical_gbs": 63.01,
+          "gen_downtrained_at_idle": true,
+          "theoretical_basis": "Gen5 x16 = 63.01 GB/s (max generation, negotiated width)"
+        },
+        "1": {
+          "gen_max": 5,
+          "gen_current": 1,
+          "width_max": 16,
+          "width_current": 8,
+          "theoretical_gbs": 31.5,
+          "width_downgraded": true,
+          "gen_downtrained_at_idle": true,
+          "theoretical_basis": "Gen5 x8 = 31.5 GB/s (max generation, negotiated width)"
+        }
+      },
+      "notes": [
+        "GPU 1 negotiated x8 on a card capable of x16. That halves the host transfer ceiling and it is a property of the slot, not of the workload.",
+        "At least one link reports a current generation below its maximum. This is normal at idle -- PCIe downtrains to save power and retrains under load -- which is exactly why the theoretical figure above is built from the maximum generation. Using the idle reading would inflate the achieved percentage by up to 16x."
+      ]
+    },
+    "nic": {
+      "nics": [
+        {
+          "name": "ens1f0",
+          "kind": "net",
+          "pci": "0000:41:00.0",
+          "numa_node": 0,
+          "speed_mbps": 200000,
+          "local_gpus": [
+            0,
+            1
+          ],
+          "n_local_gpus": 2
+        }
+      ],
+      "verdict": "every NIC has at least one GPU on its own NUMA node",
+      "gpus_by_numa": {
+        "0": [
+          0,
+          1
+        ]
+      }
+    },
+    "unavailable": {}
+  },
+  "baseline": {
+    "clean": true,
+    "headline": "Control window clean: all GPUs idle before the workload.",
+    "per_gpu": {
+      "0": {
+        "power_w": 21.4,
+        "busy_pct": 0.0,
+        "mem_used_mib": 4.0,
+        "pcie_floor_gbs": 0.0021
+      },
+      "1": {
+        "power_w": 20.8,
+        "busy_pct": 0.0,
+        "mem_used_mib": 4.0,
+        "pcie_floor_gbs": 0.0019
+      }
+    },
+    "findings": []
+  },
+  "p2p": {
+    "mode": "software",
+    "confidence": "high",
+    "headline": "Software P2P is active and every hardware probe is blind to it",
+    "explanation": "nvidia-smi topo -p2p reports CNS, cudaDeviceCanAccessPeer returns false, and every nvbandwidth device-to-device test waived -- all four probe hardware capability only. All-reduce busbw reaches 72% of measured host-to-device bandwidth, which is not achievable through host staging. Traffic is taking a peer path that the capability probes cannot see.",
+    "evidence": {
+      "h2d_gbs": 56.41,
+      "allreduce_busbw_gbs": 40.69,
+      "ratio": 0.72,
+      "threshold_peer_path": 0.55,
+      "threshold_host_bounce": 0.3,
+      "cuda_can_access_peer": "false for all pairs",
+      "topo_p2p": "CNS",
+      "nvbandwidth_d2d": "all waived"
+    }
+  },
+  "flops": {
+    "peak_tflops": 178.4,
+    "peak_dtype": "bf16",
+    "rows": [
+      {
+        "dtype": "bf16",
+        "n": 8192,
+        "tflops": 181.2,
+        "tflops_median": 178.4,
+        "cv_pct": 1.1,
+        "reps": 30
+      },
+      {
+        "dtype": "fp16",
+        "n": 8192,
+        "tflops": 179.8,
+        "tflops_median": 177.1,
+        "cv_pct": 1.3,
+        "reps": 30
+      },
+      {
+        "dtype": "tf32",
+        "n": 8192,
+        "tflops": 92.6,
+        "tflops_median": 91.0,
+        "cv_pct": 0.9,
+        "reps": 30
+      },
+      {
+        "dtype": "fp32",
+        "n": 8192,
+        "tflops": 46.1,
+        "tflops_median": 45.7,
+        "cv_pct": 0.7,
+        "reps": 30
+      }
+    ]
+  },
+  "membw": {
+    "triad_gbs": 1402.0,
+    "rows": [
+      {
+        "kernel": "copy",
+        "arrays": 2,
+        "gbs": 1451.0,
+        "bytes": 2147483648,
+        "reps": 30
+      },
+      {
+        "kernel": "mul",
+        "arrays": 2,
+        "gbs": 1447.0,
+        "bytes": 2147483648,
+        "reps": 30
+      },
+      {
+        "kernel": "add",
+        "arrays": 3,
+        "gbs": 1409.0,
+        "bytes": 3221225472,
+        "reps": 30
+      },
+      {
+        "kernel": "triad",
+        "arrays": 3,
+        "gbs": 1402.0,
+        "bytes": 3221225472,
+        "reps": 30
+      }
+    ]
+  },
+  "pcie": {
+    "h2d_gbs": 56.41,
+    "per_gpu": [
+      {
+        "gpu": 0,
+        "h2d_gbs": 56.41,
+        "d2h_gbs": 54.92,
+        "buffer_mib": 1024.0,
+        "h2d_gbs_pct_of_link": 89.5,
+        "d2h_gbs_pct_of_link": 87.2
+      },
+      {
+        "gpu": 1,
+        "h2d_gbs": 28.14,
+        "d2h_gbs": 27.3,
+        "buffer_mib": 1024.0,
+        "h2d_gbs_pct_of_link": 89.3,
+        "d2h_gbs_pct_of_link": 86.7
+      }
+    ],
+    "concurrent": {
+      "retention_pct": 71.4,
+      "aggregate_gbs": 60.0,
+      "sum_isolated_gbs": 84.55
+    },
+    "link_theoretical_gbs": 31.5,
+    "link_theoretical_max_gbs": 63.01,
+    "link_basis": "Gen5 x8 = 31.5 GB/s (max generation, negotiated width)",
+    "h2d_gbs_pct_of_link": 89.5,
+    "d2h_gbs_pct_of_link": 87.2,
+    "link_note": "Cards do not share a link: ceilings range 31.5-63.01 GB/s. Each percentage above is against that card's own link, so the columns are comparable to each other even though the GB/s columns are not."
+  },
+  "nccl": {
+    "peak_busbw_gbs": 40.69,
+    "world_size": 2,
+    "sets": [
+      {
+        "label": "2gpu",
+        "gpus": [
+          0,
+          1
+        ],
+        "world_size": 2,
+        "worst_link": "PIX",
+        "peak_busbw_gbs": 40.69,
+        "rows": [
+          {
+            "collective": "all_gather",
+            "size_mib": 256.0,
+            "algbw_gbs": 41.8,
+            "busbw_gbs": 20.9,
+            "time_ms": 6.42
+          },
+          {
+            "collective": "all_gather",
+            "size_mib": 1024.0,
+            "algbw_gbs": 43.1,
+            "busbw_gbs": 21.55,
+            "time_ms": 24.91
+          },
+          {
+            "collective": "all_reduce",
+            "size_mib": 16.0,
+            "algbw_gbs": 18.4,
+            "busbw_gbs": 18.4,
+            "time_ms": 0.91
+          },
+          {
+            "collective": "all_reduce",
+            "size_mib": 256.0,
+            "algbw_gbs": 38.9,
+            "busbw_gbs": 38.9,
+            "time_ms": 6.9
+          },
+          {
+            "collective": "all_reduce",
+            "size_mib": 1024.0,
+            "algbw_gbs": 40.69,
+            "busbw_gbs": 40.69,
+            "time_ms": 26.38
+          },
+          {
+            "collective": "reduce_scatter",
+            "size_mib": 1024.0,
+            "algbw_gbs": 42.6,
+            "busbw_gbs": 21.3,
+            "time_ms": 25.2
+          }
+        ]
+      }
+    ]
+  },
+  "scaling": {
+    "ok": true,
+    "metric": "samples_per_s",
+    "baseline": {
+      "label": "1gpu",
+      "gpus": 1,
+      "samples_per_s": 14.8
+    },
+    "rows": [
+      {
+        "label": "1gpu",
+        "gpus": 1,
+        "samples_per_s": 14.8,
+        "speedup": 1.0,
+        "efficiency": 1.0,
+        "efficiency_pct": 100.0,
+        "verdict": "good",
+        "iter_time_s_median": 0.1351,
+        "step_inflation_pct": 0.0
+      },
+      {
+        "label": "2gpu",
+        "gpus": 2,
+        "samples_per_s": 28.1,
+        "speedup": 1.899,
+        "efficiency": 0.9493,
+        "efficiency_pct": 94.9,
+        "verdict": "good",
+        "iter_time_s_median": 0.1423,
+        "step_inflation_pct": 5.3
+      }
+    ],
+    "topology_pairs": [],
+    "notes": [],
+    "caveat": "Efficiency is relative to the measured baseline above, not to a datasheet. Global batch grows with GPU count, so speedup and per-step time move in opposite directions -- read both columns."
+  },
+  "crosscheck": {
+    "rows": [
+      {
+        "quantity": "flops",
+        "torch_method": "torch.matmul on a square GEMM",
+        "native_method": "cuBLAS/CUTLASS profiler best kernel",
+        "torch_value": 178.4,
+        "native_value": 186.2,
+        "note": "Both are achieved throughput on one shape. CUTLASS may win by picking a better tile for that shape; a gap in its favour is normal, the reverse is not.",
+        "divergence_pct": 4.19,
+        "ratio_torch_over_native": 0.9581,
+        "status": "agree"
+      },
+      {
+        "quantity": "membw",
+        "torch_method": "PyTorch tensor kernels (copy/mul/add/triad)",
+        "native_method": "BabelStream",
+        "torch_value": 1402.0,
+        "native_value": 1421.0,
+        "note": "Same four kernels by construction. These should agree closely; if they do not, one of them is not saturating the array size.",
+        "divergence_pct": 1.34,
+        "ratio_torch_over_native": 0.9866,
+        "status": "agree"
+      },
+      {
+        "quantity": "pcie_h2d",
+        "torch_method": "pinned host buffer + cudaMemcpyAsync via torch",
+        "native_method": "nvbandwidth host_to_device_memcpy_ce",
+        "torch_value": 56.41,
+        "native_value": 55.9,
+        "note": "nvbandwidth uses the copy engine explicitly. A large gap usually means the torch-side buffer was pageable, not pinned.",
+        "divergence_pct": 0.9,
+        "ratio_torch_over_native": 1.0091,
+        "status": "agree"
+      },
+      {
+        "quantity": "allreduce_busbw",
+        "torch_method": "torch.distributed all_reduce, CUDA-event timed",
+        "native_method": "nccl-tests all_reduce_perf",
+        "torch_value": 40.69,
+        "native_value": 41.2,
+        "note": "Same NCCL underneath. Divergence here points at the harness -- different message size, missing barrier, or timing that includes launch overhead.",
+        "divergence_pct": 1.24,
+        "ratio_torch_over_native": 0.9876,
+        "status": "agree"
+      }
+    ],
+    "counts": {
+      "agree": 4,
+      "differ": 0,
+      "conflict": 0,
+      "unavailable": 0
+    },
+    "headline": "All 4 cross-checked quantities agree within 5% across two independent implementations.",
+    "agreement_threshold_pct": 5.0,
+    "concern_threshold_pct": 15.0
+  },
+  "caveats": {
+    "covered_with_limits": [
+      {
+        "module": "flops",
+        "limits": [
+          "Achieved throughput on square GEMMs at the configured sizes. Not the silicon peak, and not representative of the skinny/irregular shapes real models spend time in.",
+          "Single-GPU only. Says nothing about how compute overlaps with communication."
+        ]
+      },
+      {
+        "module": "membw",
+        "limits": [
+          "Streaming access on large contiguous buffers -- the best case for the memory system. Random or strided access patterns will be far slower and are not measured.",
+          "Cache behaviour is deliberately excluded by sizing buffers past L2."
+        ]
+      },
+      {
+        "module": "pcie",
+        "limits": [
+          "Bulk transfer of large pinned buffers. Small-transfer latency and the per-call overhead that dominates inference serving are not measured.",
+          "Host-to-device and device-to-host only. Does not establish whether device-to-device traffic takes a peer path -- see the P2P section for that."
+        ]
+      },
+      {
+        "module": "nccl",
+        "limits": [
+          "Collectives in isolation on an otherwise idle node. Real training overlaps them with compute, so these are an upper bound on what a training job will see.",
+          "Only the configured message sizes and collectives. Small-message latency behaviour differs qualitatively from large-message bandwidth behaviour."
+        ]
+      },
+      {
+        "module": "p2p",
+        "limits": [
+          "The verdict is inferred from a bandwidth ratio, not read from a register. It is stated with a confidence level for that reason."
+        ]
+      },
+      {
+        "module": "monitor",
+        "limits": [
+          "NVML's PCIe counter is a ~20 ms windowed average, so it cannot be integrated to a transfer volume and its peaks are 20 ms peaks, not link capacity.",
+          "'busy_pct' is the fraction of time at least one kernel was resident. It is not SM occupancy; a card can read 100% busy while using a few percent of its SMs."
+        ]
+      }
+    ],
+    "not_run": [
+      {
+        "module": "host",
+        "reason": "not in the configured module list",
+        "consequence": "Nothing in this report speaks to host."
+      }
+    ],
+    "out_of_scope": [
+      {
+        "topic": "thermal_sustained",
+        "text": "Sustained multi-hour thermal behaviour. Runs here are minutes long; a datacentre job is hours, and clocks drop over that horizon."
+      },
+      {
+        "topic": "multi_node",
+        "text": "Anything across nodes. This tool measures one node. InfiniBand/RoCE fabric, NCCL tuning across hosts, and rail topology are entirely out of scope."
+      },
+      {
+        "topic": "numerics",
+        "text": "Numerical accuracy. Throughput is measured, correctness of the results is not. A fast kernel producing wrong values would pass every test here."
+      },
+      {
+        "topic": "storage",
+        "text": "Storage and dataset pipeline throughput, except indirectly via data_time in training-log parsing."
+      },
+      {
+        "topic": "power_efficiency",
+        "text": "Performance per watt as a design conclusion. Power is sampled, but no controlled efficiency comparison is made."
+      }
+    ],
+    "conditional": [],
+    "principle": "Anything not covered is recorded here rather than omitted, so a reader can tell 'measured and fine' apart from 'never looked'."
+  },
+  "manifest": {
+    "n_files": 9,
+    "total_bytes": 486213,
+    "hash_algorithm": "md5",
+    "notes": [],
+    "files": [
+      {
+        "path": "raw/environment.json",
+        "bytes": 2144,
+        "lines": 71,
+        "md5": "5f2c9a1e8b4d7c30aa11",
+        "produced_by": "probe.compat"
+      },
+      {
+        "path": "raw/topology.json",
+        "bytes": 1022,
+        "lines": 34,
+        "md5": "9d31ba77e0c45f81cc02",
+        "produced_by": "nvidia-smi topo -m"
+      },
+      {
+        "path": "raw/idle_baseline.csv",
+        "bytes": 4806,
+        "lines": 18,
+        "md5": "17aa04c9f3b28d6e5510",
+        "produced_by": "monitor.nvml (control group)"
+      },
+      {
+        "path": "raw/monitor.csv",
+        "bytes": 402918,
+        "lines": 1447,
+        "md5": "c40e7b2159af83dd6621",
+        "produced_by": "monitor.nvml"
+      },
+      {
+        "path": "raw/flops.json",
+        "bytes": 1388,
+        "lines": 52,
+        "md5": "aa19c3e4d70b5182ff40",
+        "produced_by": "bench.flops_torch"
+      },
+      {
+        "path": "raw/membw.json",
+        "bytes": 1204,
+        "lines": 48,
+        "md5": "b7c250af9e3168d40a13",
+        "produced_by": "bench.membw_torch"
+      },
+      {
+        "path": "raw/pcie.json",
+        "bytes": 1566,
+        "lines": 55,
+        "md5": "3e8f10ca47bb92d5e708",
+        "produced_by": "bench.pcie_torch"
+      },
+      {
+        "path": "raw/nccl.json",
+        "bytes": 4902,
+        "lines": 168,
+        "md5": "d21b6effa0c39471bb85",
+        "produced_by": "bench.nccl_torch"
+      },
+      {
+        "path": "raw/p2p.json",
+        "bytes": 2263,
+        "lines": 66,
+        "md5": "6cf3aa81b429d05e7712",
+        "produced_by": "probe.p2p"
+      }
+    ]
+  }
+}

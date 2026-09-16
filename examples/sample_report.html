@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Node benchmark: EXAMPLE -- synthetic data, not a real machine</title>
+<style>
+/* ---------------------------------------------------------------------------
+   Palette. Roles only in the body below; hex lives here so light/dark swap in
+   one place. Values are the validated reference palette (categorical slots 1-3
+   clear the all-pairs CVD and normal-vision floors in both modes).
+   --------------------------------------------------------------------------- */
+:root {
+  color-scheme: light;
+  --page:            #f9f9f7;
+  --surface-1:       #fcfcfb;
+  --text-primary:    #0b0b0b;
+  --text-secondary:  #52514e;
+  --text-muted:      #898781;
+  --grid:            #e1e0d9;
+  --axis:            #c3c2b7;
+  --border:          rgba(11,11,11,0.10);
+  --series-1:        #2a78d6;
+  --series-2:        #eb6834;
+  --series-3:        #1baf7a;
+  --track:           #e1e0d9;
+  --good:            #0ca30c;
+  --warning:         #fab219;
+  --serious:         #ec835a;
+  --critical:        #d03b3b;
+  --good-text:       #006300;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page:           #0d0d0d;
+    --surface-1:      #1a1a19;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --grid:           #2c2c2a;
+    --axis:           #383835;
+    --border:         rgba(255,255,255,0.10);
+    --series-1:       #3987e5;
+    --series-2:       #d95926;
+    --series-3:       #199e70;
+    --track:          #2c2c2a;
+    --good-text:      #0ca30c;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page:           #0d0d0d;
+  --surface-1:      #1a1a19;
+  --text-primary:   #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted:     #898781;
+  --grid:           #2c2c2a;
+  --axis:           #383835;
+  --border:         rgba(255,255,255,0.10);
+  --series-1:       #3987e5;
+  --series-2:       #d95926;
+  --series-3:       #199e70;
+  --track:          #2c2c2a;
+  --good-text:      #0ca30c;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 32px 20px 80px;
+  background: var(--page); color: var(--text-primary);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.wrap { max-width: 1080px; margin: 0 auto; }
+
+header.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+h1 { font-size: 26px; line-height: 1.25; margin: 0 0 4px; font-weight: 650; }
+.subtitle { color: var(--text-secondary); font-size: 14px; margin: 0; }
+.themebtn {
+  border: 1px solid var(--border); background: var(--surface-1); color: var(--text-secondary);
+  border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap;
+}
+.themebtn:hover { color: var(--text-primary); }
+
+section { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; margin: 20px 0; }
+h2 { font-size: 17px; margin: 0 0 4px; font-weight: 650; }
+h3 { font-size: 14px; margin: 20px 0 6px; font-weight: 600; color: var(--text-secondary); }
+.lede { color: var(--text-secondary); font-size: 13.5px; margin: 0 0 14px; max-width: 78ch; }
+p.note { color: var(--text-secondary); font-size: 13px; margin: 10px 0 0; max-width: 82ch; }
+p.note code, code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; background: var(--page); padding: 1px 5px; border-radius: 4px; }
+
+/* Stat tiles -- a headline number is not a chart; do not plot it. */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 2px; }
+.tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.tile .label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+.tile .value { font-size: 28px; font-weight: 650; line-height: 1.15; margin-top: 4px; }
+.tile .unit { font-size: 14px; font-weight: 500; color: var(--text-secondary); margin-left: 3px; }
+.tile .sub { font-size: 12.5px; color: var(--text-secondary); margin-top: 3px; }
+
+/* Horizontal bar meters. Thin marks, 4px rounded data end anchored at zero. */
+.meters { margin-top: 6px; }
+.meter { display: grid; grid-template-columns: 190px 1fr 96px; align-items: center; gap: 12px; padding: 5px 0; }
+.meter .mlabel { font-size: 13px; color: var(--text-secondary); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meter .mtrack { position: relative; height: 14px; background: var(--track); border-radius: 4px; overflow: hidden; }
+.meter .mfill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 0 4px 4px 0; background: var(--series-1); }
+.meter .mfill.s2 { background: var(--series-2); }
+.meter .mfill.good { background: var(--good); }
+.meter .mfill.warning { background: var(--warning); }
+.meter .mfill.serious { background: var(--serious); }
+.meter .mfill.critical { background: var(--critical); }
+.meter .mref { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--axis); }
+.meter .mval { font-size: 13px; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.meterhead { display: grid; grid-template-columns: 190px 1fr 96px; gap: 12px; font-size: 12px; color: var(--text-muted); padding-bottom: 4px; }
+.meterhead span:nth-child(1) { text-align: right; }
+
+/* Legend -- present whenever two or more series share an axis. */
+.legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 10px 0 6px; font-size: 12.5px; color: var(--text-secondary); }
+.legend .k { display: inline-flex; align-items: center; gap: 6px; }
+.legend .sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-top: 8px; }
+th { text-align: left; font-weight: 600; color: var(--text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: .03em; padding: 7px 10px 7px 0; border-bottom: 1px solid var(--axis); white-space: nowrap; }
+td { padding: 8px 10px 8px 0; border-bottom: 1px solid var(--grid); vertical-align: top; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; padding-right: 14px; }
+tr:last-child td { border-bottom: none; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+
+/* Status: always icon + label, never color alone. */
+.pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.pill .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; }
+.pill.good { color: var(--good-text); } .pill.good .dot { background: var(--good); }
+.pill.warning { color: var(--text-primary); } .pill.warning .dot { background: var(--warning); }
+.pill.serious { color: var(--text-primary); } .pill.serious .dot { background: var(--serious); }
+.pill.critical { color: var(--critical); } .pill.critical .dot { background: var(--critical); }
+.pill.muted { color: var(--text-muted); } .pill.muted .dot { background: var(--axis); }
+
+.callout { border-left: 3px solid var(--axis); padding: 10px 0 10px 14px; margin: 12px 0; font-size: 13.5px; color: var(--text-secondary); }
+.callout strong { color: var(--text-primary); }
+.callout.good { border-left-color: var(--good); }
+.callout.warning { border-left-color: var(--warning); }
+.callout.serious { border-left-color: var(--serious); }
+.callout.critical { border-left-color: var(--critical); }
+
+ul.plain { margin: 8px 0 0; padding-left: 18px; color: var(--text-secondary); font-size: 13.5px; }
+ul.plain li { margin: 5px 0; }
+
+details { margin-top: 10px; }
+summary { cursor: pointer; font-size: 13px; color: var(--text-secondary); }
+summary:hover { color: var(--text-primary); }
+
+footer { color: var(--text-muted); font-size: 12.5px; margin-top: 28px; text-align: center; }
+
+@media print { body { background: #fff; } section { break-inside: avoid; } .themebtn { display: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div>
+    <h1>Node benchmark: EXAMPLE -- synthetic data, not a real machine</h1>
+    <p class="subtitle">example / 2 GPUs / nodebench 0.1.0 / Every number below is fabricated to demonstrate the report layout.</p>
+  </div>
+  <button class="themebtn" id="tt" type="button">Theme</button>
+</header>
+
+<section><h2>Headline</h2><p class="lede">Single numbers, stated with the condition that produced them. None of these is a datasheet figure; each is what this node did on this configuration.</p><div class="tiles"><div class="tile"><div class="label">Peak GEMM</div><div class="value">178.4<span class="unit"> TFLOP/s</span></div><div class="sub">bf16, achieved not peak</div></div><div class="tile"><div class="label">Memory (triad)</div><div class="value">1,402<span class="unit"> GB/s</span></div><div class="sub">streaming, large buffers</div></div><div class="tile"><div class="label">Host to device</div><div class="value">56.4<span class="unit"> GB/s</span></div><div class="sub">pinned, per GPU</div></div><div class="tile"><div class="label">All-reduce busbw</div><div class="value">40.7<span class="unit"> GB/s</span></div><div class="sub">2 GPUs, bus-corrected</div></div><div class="tile"><div class="label">GPU-to-GPU path</div><div class="value">software</div><div class="sub">confidence: high</div></div></div></section><section><h2>Control group</h2><p class="lede">Sampled before the workload with nothing running. This is the noise floor every number below is measured against -- without it, a busy node and a fast node look the same.</p><div class="callout good">Control window clean: all GPUs idle before the workload.</div><table><thead><tr><th>Device</th><th class="num">Idle power (W)</th><th class="num">Busy (%)</th><th class="num">Memory held (MiB)</th><th class="num">PCIe floor (GB/s)</th></tr></thead><tbody><tr><td>GPU 0</td><td class="num">21.40</td><td class="num">0.00</td><td class="num">4.00</td><td class="num">0.00</td></tr><tr><td>GPU 1</td><td class="num">20.80</td><td class="num">0.00</td><td class="num">4.00</td><td class="num">0.00</td></tr></tbody></table><p class="note">"Busy" is NVML's utilization.gpu: the fraction of the sampling period with at least one kernel resident. It is not SM occupancy.</p></section><section><h2>GPU-to-GPU path</h2><p class="lede">Whether traffic between two GPUs takes a direct peer path or bounces through host memory. Every standard probe -- nvidia-smi topo -p2p, p2pBandwidthLatencyTest, nvbandwidth D2D, cudaDeviceCanAccessPeer -- answers only whether the HARDWARE supports it. A platform that routes peer traffic in the driver is invisible to all four, so the verdict below is inferred from achieved bandwidth instead.</p><div class="callout good"><strong>software:</strong> Software P2P is active and every hardware probe is blind to it</div><p class="note">nvidia-smi topo -p2p reports CNS, cudaDeviceCanAccessPeer returns false, and every nvbandwidth device-to-device test waived -- all four probe hardware capability only. All-reduce busbw reaches 72% of measured host-to-device bandwidth, which is not achievable through host staging. Traffic is taking a peer path that the capability probes cannot see.</p><table><thead><tr><th>Evidence</th><th class="num">Value</th></tr></thead><tbody><tr><td>h2d gbs</td><td class="num">56.41</td></tr><tr><td>allreduce busbw gbs</td><td class="num">40.69</td></tr><tr><td>ratio</td><td class="num">0.72</td></tr><tr><td>threshold peer path</td><td class="num">0.55</td></tr><tr><td>threshold host bounce</td><td class="num">0.30</td></tr><tr><td>cuda can access peer</td><td class="num">false for all pairs</td></tr><tr><td>topo p2p</td><td class="num">CNS</td></tr><tr><td>nvbandwidth d2d</td><td class="num">all waived</td></tr></tbody></table><p class="note">Discriminator: all-reduce busbw divided by host-to-device bandwidth. At or above 0.55 the traffic is taking a peer path; at or below 0.30 it is bouncing through the host. Between the two the answer is reported as inconclusive rather than guessed.</p></section><section><h2>Scaling</h2><p class="lede">Speedup and efficiency relative to the measured 1gpu baseline on this same node -- never against a datasheet, which would fold the node&#x27;s own single-card behaviour into the scaling figure.</p><div class="meterhead"><span>Configuration</span><span>Efficiency vs ideal</span><span></span></div><div class="meters"><div class="meter"><span class="mlabel">1gpu</span><span class="mtrack"><span class="mfill good" style="width:100.00%"></span><span class="mref" style="left:100.00%"></span></span><span class="mval">100%</span></div><div class="meter"><span class="mlabel">2gpu</span><span class="mtrack"><span class="mfill good" style="width:94.90%"></span><span class="mref" style="left:100.00%"></span></span><span class="mval">95%</span></div></div><table><thead><tr><th>Configuration</th><th class="num">GPUs</th><th class="num">samples_per_s</th><th class="num">Speedup</th><th class="num">Efficiency</th><th class="num">Step time inflation</th><th></th></tr></thead><tbody><tr><td>1gpu</td><td class="num">1</td><td class="num">14.80</td><td class="num">1.00</td><td class="num">100.0%</td><td class="num">+0.0%</td><td><span class="pill good"><span class="dot"></span>OK</span></td></tr><tr><td>2gpu</td><td class="num">2</td><td class="num">28.10</td><td class="num">1.90</td><td class="num">94.9%</td><td class="num">+5.3%</td><td><span class="pill good"><span class="dot"></span>OK</span></td></tr></tbody></table><p class="note">Efficiency is relative to the measured baseline above, not to a datasheet. Global batch grows with GPU count, so speedup and per-step time move in opposite directions -- read both columns.</p></section><section><h2>Collectives</h2><p class="lede">torch.distributed over NCCL, one process per GPU, CUDA-event timed with a barrier between iterations. Bandwidth is reported bus-corrected (busbw), because the raw bytes/second figure is not comparable across collectives or GPU counts.</p><div class="meterhead"><span>GPU set</span><span>Peak all-reduce busbw</span><span></span></div><div class="meters"><div class="meter"><span class="mlabel">2gpu</span><span class="mtrack"><span class="mfill" style="width:100.00%"></span></span><span class="mval">40.7 GB/s</span></div></div><table><thead><tr><th>GPU set</th><th>Collective</th><th class="num">Size (MiB)</th><th class="num">algbw (GB/s)</th><th class="num">busbw (GB/s)</th><th class="num">time (ms)</th></tr></thead><tbody><tr><td>2gpu</td><td>all_gather</td><td class="num">256.00</td><td class="num">41.80</td><td class="num">20.90</td><td class="num">6.42</td></tr><tr><td>2gpu</td><td>all_gather</td><td class="num">1,024.00</td><td class="num">43.10</td><td class="num">21.55</td><td class="num">24.91</td></tr><tr><td>2gpu</td><td>all_reduce</td><td class="num">16.00</td><td class="num">18.40</td><td class="num">18.40</td><td class="num">0.91</td></tr><tr><td>2gpu</td><td>all_reduce</td><td class="num">256.00</td><td class="num">38.90</td><td class="num">38.90</td><td class="num">6.90</td></tr><tr><td>2gpu</td><td>all_reduce</td><td class="num">1,024.00</td><td class="num">40.69</td><td class="num">40.69</td><td class="num">26.38</td></tr><tr><td>2gpu</td><td>reduce_scatter</td><td class="num">1,024.00</td><td class="num">42.60</td><td class="num">21.30</td><td class="num">25.20</td></tr></tbody></table><p class="note">busbw = algbw x factor, where the factor is 2(N-1)/N for all-reduce, (N-1)/N for all-gather, reduce-scatter and all-to-all, and 1 for broadcast and reduce. Quoting algbw across different GPU counts compares two different quantities.</p></section><section><h2>PCIe / host transfer</h2><p class="lede">Pinned host buffers, timed with CUDA events. Both details matter: pageable memory forces a staging copy that can make a Gen5 link measure like Gen2, and wall-clock timing around an async copy measures the launch, not the transfer.</p><div class="legend"><span class="k"><span class="sw" style="background:var(--series-1)"></span>Host to device</span><span class="k"><span class="sw" style="background:var(--series-2)"></span>Device to host</span></div><div class="meterhead"><span>Direction</span><span>GB/s</span><span></span></div><div class="meters"><div class="meter"><span class="mlabel">GPU 0 H2D</span><span class="mtrack"><span class="mfill" style="width:89.53%"></span></span><span class="mval">56.4 GB/s</span></div><div class="meter"><span class="mlabel">GPU 0 D2H</span><span class="mtrack"><span class="mfill s2" style="width:87.16%"></span></span><span class="mval">54.9 GB/s</span></div><div class="meter"><span class="mlabel">GPU 1 H2D</span><span class="mtrack"><span class="mfill" style="width:44.66%"></span></span><span class="mval">28.1 GB/s</span></div><div class="meter"><span class="mlabel">GPU 1 D2H</span><span class="mtrack"><span class="mfill s2" style="width:43.33%"></span></span><span class="mval">27.3 GB/s</span></div></div><table><thead><tr><th>GPU</th><th class="num">H2D (GB/s)</th><th class="num">D2H (GB/s)</th><th class="num">Buffer (MiB)</th><th class="num">H2D % of link</th><th class="num">D2H % of link</th></tr></thead><tbody><tr><td>0</td><td class="num">56.41</td><td class="num">54.92</td><td class="num">1,024.00</td><td class="num">89.50</td><td class="num">87.20</td></tr><tr><td>1</td><td class="num">28.14</td><td class="num">27.30</td><td class="num">1,024.00</td><td class="num">89.30</td><td class="num">86.70</td></tr></tbody></table><div class="callout good"><strong>Against the link:</strong> Best host-to-device reading is 90% of what its own card&#x27;s link can carry (link ceilings on this node: 31.5-63.0 GB/s).</div><p class="note">Cards do not share a link: ceilings range 31.5-63.01 GB/s. Each percentage above is against that card&#x27;s own link, so the columns are comparable to each other even though the GB/s columns are not.</p><div class="legend"><span class="k"><span class="sw" style="background:var(--series-1)"></span>Aggregate when all GPUs transfer at once</span></div><div class="meterhead"><span>Concurrent</span><span>% of isolated sum</span><span></span></div><div class="meters"><div class="meter"><span class="mlabel">All GPUs at once</span><span class="mtrack"><span class="mfill warning" style="width:71.40%"></span><span class="mref" style="left:100.00%"></span></span><span class="mval">71%</span></div></div><div class="callout warning">Running every GPU at once retains 71% of the sum of their isolated rates (60.0 of 84.5 GB/s). Loss here comes from host memory bandwidth and PCIe root-complex contention, not from the links.</div><p class="note">The concurrent number is the one that reveals under-populated memory channels. No single-card test can show it, and it is what limits multi-GPU data loading in practice.</p></section><section><h2>Compute</h2><p class="lede">Square GEMM throughput, timed with CUDA events. This is achieved cuBLAS throughput on one shape -- it is not the silicon peak, and real models spend much of their time on shapes that do worse.</p><div class="meterhead"><span>Configuration</span><span>TFLOP/s</span><span></span></div><div class="meters"><div class="meter"><span class="mlabel">bf16 n=8192</span><span class="mtrack"><span class="mfill" style="width:100.00%"></span></span><span class="mval">181.2 TF</span></div><div class="meter"><span class="mlabel">fp16 n=8192</span><span class="mtrack"><span class="mfill" style="width:99.23%"></span></span><span class="mval">179.8 TF</span></div><div class="meter"><span class="mlabel">tf32 n=8192</span><span class="mtrack"><span class="mfill" style="width:51.10%"></span></span><span class="mval">92.6 TF</span></div><div class="meter"><span class="mlabel">fp32 n=8192</span><span class="mtrack"><span class="mfill" style="width:25.44%"></span></span><span class="mval">46.1 TF</span></div></div><table><thead><tr><th>dtype</th><th class="num">n</th><th class="num">TFLOP/s (best)</th><th class="num">TFLOP/s (median)</th><th class="num">CV %</th><th class="num">reps</th></tr></thead><tbody><tr><td>bf16</td><td class="num">8,192</td><td class="num">181.20</td><td class="num">178.40</td><td class="num">1.10</td><td class="num">30</td></tr><tr><td>fp16</td><td class="num">8,192</td><td class="num">179.80</td><td class="num">177.10</td><td class="num">1.30</td><td class="num">30</td></tr><tr><td>tf32</td><td class="num">8,192</td><td class="num">92.60</td><td class="num">91.00</td><td class="num">0.90</td><td class="num">30</td></tr><tr><td>fp32</td><td class="num">8,192</td><td class="num">46.10</td><td class="num">45.70</td><td class="num">0.70</td><td class="num">30</td></tr></tbody></table><p class="note">Best and median are both reported so a single lucky repetition cannot be quoted as the result. A high CV means the card was not in a steady state.</p></section><section><h2>Memory bandwidth</h2><p class="lede">The four BabelStream kernels, implemented in PyTorch. Buffers are sized past L2 on purpose, so this measures HBM/GDDR streaming and not cache.</p><div class="meterhead"><span>Kernel</span><span>GB/s</span><span></span></div><div class="meters"><div class="meter"><span class="mlabel">copy</span><span class="mtrack"><span class="mfill" style="width:100.00%"></span></span><span class="mval">1,451 GB/s</span></div><div class="meter"><span class="mlabel">mul</span><span class="mtrack"><span class="mfill" style="width:99.72%"></span></span><span class="mval">1,447 GB/s</span></div><div class="meter"><span class="mlabel">add</span><span class="mtrack"><span class="mfill" style="width:97.11%"></span></span><span class="mval">1,409 GB/s</span></div><div class="meter"><span class="mlabel">triad</span><span class="mtrack"><span class="mfill" style="width:96.62%"></span></span><span class="mval">1,402 GB/s</span></div></div><table><thead><tr><th>Kernel</th><th class="num">Arrays touched</th><th class="num">GB/s</th><th class="num">Bytes moved</th><th class="num">reps</th></tr></thead><tbody><tr><td>copy</td><td class="num">2</td><td class="num">1,451.00</td><td class="num">2,147,483,648</td><td class="num">30</td></tr><tr><td>mul</td><td class="num">2</td><td class="num">1,447.00</td><td class="num">2,147,483,648</td><td class="num">30</td></tr><tr><td>add</td><td class="num">3</td><td class="num">1,409.00</td><td class="num">3,221,225,472</td><td class="num">30</td></tr><tr><td>triad</td><td class="num">3</td><td class="num">1,402.00</td><td class="num">3,221,225,472</td><td class="num">30</td></tr></tbody></table><p class="note">GB/s here is decimal (1e9 bytes/s), matching how vendors quote memory bandwidth. Using GiB/s would understate the number by 7% against the datasheet.</p></section><section><h2>Cross-check: two independent implementations</h2><p class="lede">The same physical quantity measured two different ways -- PyTorch on one side, the native C++ toolchain (nccl-tests, nvbandwidth, BabelStream, CUTLASS) on the other. Agreement does not prove either is right, but disagreement proves one is wrong, and that is worth more than another decimal place.</p><div class="callout good">All 4 cross-checked quantities agree within 5% across two independent implementations.</div><table><thead><tr><th>Quantity</th><th class="num">PyTorch</th><th class="num">Native</th><th class="num">Divergence</th><th>Verdict</th></tr></thead><tbody><tr><td>flops</td><td class="num">178.40</td><td class="num">186.20</td><td class="num">4.2%</td><td><span class="pill good"><span class="dot"></span>agree</span></td></tr><tr><td>membw</td><td class="num">1,402.00</td><td class="num">1,421.00</td><td class="num">1.3%</td><td><span class="pill good"><span class="dot"></span>agree</span></td></tr><tr><td>pcie_h2d</td><td class="num">56.41</td><td class="num">55.90</td><td class="num">0.9%</td><td><span class="pill good"><span class="dot"></span>agree</span></td></tr><tr><td>allreduce_busbw</td><td class="num">40.69</td><td class="num">41.20</td><td class="num">1.2%</td><td><span class="pill good"><span class="dot"></span>agree</span></td></tr></tbody></table><p class="note"><strong>flops</strong>: Both are achieved throughput on one shape. CUTLASS may win by picking a better tile for that shape; a gap in its favour is normal, the reverse is not. </p><p class="note"><strong>membw</strong>: Same four kernels by construction. These should agree closely; if they do not, one of them is not saturating the array size. </p><p class="note"><strong>pcie_h2d</strong>: nvbandwidth uses the copy engine explicitly. A large gap usually means the torch-side buffer was pageable, not pinned. </p><p class="note"><strong>allreduce_busbw</strong>: Same NCCL underneath. Divergence here points at the harness -- different message size, missing barrier, or timing that includes launch overhead. </p></section><section><h2>Topology</h2><p class="lede">Which GPUs are close to each other. This is the variable behind every multi-GPU result: the same four cards chosen two different ways can differ by more than the difference between two GPU models.</p><table><thead><tr><th></th><th>GPU0</th><th>GPU1</th></tr></thead><tbody><tr><td>GPU0</td><td>X</td><td>PIX</td></tr><tr><td>GPU1</td><td>PIX</td><td>X</td></tr></tbody></table><table><thead><tr><th>NUMA group</th><th>GPUs</th></tr></thead><tbody><tr><td>group 0</td><td>0, 1</td></tr></tbody></table><p class="note">Link ranking, best to worst: NV# (NVLink) &gt; PIX &gt; PXB &gt; PHB &gt; NODE &gt; SYS. A SYS hop means the traffic crosses the CPU interconnect.</p></section><section><h2>Host: CPU, memory, PCIe link, NIC placement</h2><p class="lede">Not measurements -- denominators. The link row below is what the host-transfer figures are divided by, and the NIC rows are what a multi-node result would be explained by.</p><div class="tiles"><div class="tile"><div class="label">CPU</div><div class="value">AMD EPYC 9554 64-Core Processor</div></div><div class="tile"><div class="label">Logical CPUs</div><div class="value">256</div><div class="sub">2 socket x 64 cores</div></div><div class="tile"><div class="label">NUMA nodes</div><div class="value">2</div></div><div class="tile"><div class="label">Host memory</div><div class="value">1,007.5<span class="unit"> GiB</span></div><div class="sub">953.7 GiB available</div></div></div><table><thead><tr><th>GPU</th><th>Gen max</th><th>Gen current</th><th>Width max</th><th>Width current</th><th class="num">Theoretical (GB/s)</th></tr></thead><tbody><tr><td>GPU 0</td><td>Gen5</td><td>Gen1 (idle)</td><td>x16</td><td>x16</td><td class="num">63.01</td></tr><tr><td>GPU 1</td><td>Gen5</td><td>Gen1 (idle)</td><td>x16</td><td>x8</td><td class="num">31.50</td></tr></tbody></table><p class="note">The theoretical figure is built from the <em>maximum</em> generation and the <em>current</em> width, and the mismatch is deliberate. A link downtrains to Gen1 when idle and retrains under load, so the current generation understates it by up to 16x; width does not downtrain, so a current width below the maximum is a permanent property of the slot.</p><ul class="plain"><li>GPU 1 negotiated x8 on a card capable of x16. That halves the host transfer ceiling and it is a property of the slot, not of the workload.</li><li>At least one link reports a current generation below its maximum. This is normal at idle -- PCIe downtrains to save power and retrains under load -- which is exactly why the theoretical figure above is built from the maximum generation. Using the idle reading would inflate the achieved percentage by up to 16x.</li></ul><table><thead><tr><th>Interface</th><th>Kind</th><th class="num">Speed (Mbps)</th><th class="num">NUMA node</th><th>GPUs on that node</th></tr></thead><tbody><tr><td>ens1f0</td><td>net</td><td class="num">200,000</td><td class="num">0</td><td>GPU0, GPU1</td></tr></tbody></table><div class="callout good"><strong>NIC affinity:</strong> every NIC has at least one GPU on its own NUMA node</div></section><section><h2>Environment and compatibility</h2><p class="lede">Three things must line up: the GPU&#x27;s compute capability, the CUDA version, and whether the installed torch build actually contains code for that architecture. The third is the one people forget -- a CUDA 12.8 wheel can still ship without an sm_120 cubin, and the failure looks like a mysterious kernel error at runtime.</p><table><thead><tr><th>Device</th><th>Name</th><th>Compute cap</th><th>Driver</th><th class="num">VRAM (MiB)</th></tr></thead><tbody><tr><td>0</td><td>NVIDIA GeForce RTX 5090</td><td>12.0</td><td>570.86.16</td><td class="num">32,607</td></tr><tr><td>1</td><td>NVIDIA GeForce RTX 5090</td><td>12.0</td><td>570.86.16</td><td class="num">32,607</td></tr></tbody></table><table><thead><tr><th>torch</th><th>built for CUDA</th><th>NCCL</th><th>compiled architectures</th></tr></thead><tbody><tr><td>2.7.0+cu128</td><td>12.8</td><td>2.26.2</td><td>sm_75, sm_80, sm_86, sm_90, sm_100, sm_120</td></tr></tbody></table><table><thead><tr><th></th><th>Subject</th><th>Finding</th></tr></thead><tbody><tr><td><span class="pill good"><span class="dot"></span>OK</span></td><td>sm_120 present in this torch build</td><td>torch 2.7.0+cu128 contains a cubin for compute capability 12.0. No PTX JIT at first launch.</td></tr><tr><td><span class="pill good"><span class="dot"></span>OK</span></td><td>CUDA 12.8 is new enough for Blackwell</td><td>sm_120 requires CUDA 12.8 or later.</td></tr><tr><td><span class="pill warning"><span class="dot"></span>Check</span></td><td>NCCL 2.26.2 on Blackwell</td><td>2.21 is the practical minimum on this architecture and newer is materially better. Worth checking whether a newer NCCL is available before treating the collective numbers as a ceiling.</td></tr></tbody></table></section><section><h2>What this run does NOT tell you</h2><p class="lede">Anything not covered is recorded here rather than omitted, so a reader can tell &#x27;measured and fine&#x27; apart from &#x27;never looked&#x27;.</p><h3>What was measured, and what those measurements cannot tell you</h3><table><thead><tr><th>Module</th><th>Structural limits</th></tr></thead><tbody><tr><td>flops</td><td>Achieved throughput on square GEMMs at the configured sizes. Not the silicon peak, and not representative of the skinny/irregular shapes real models spend time in. / Single-GPU only. Says nothing about how compute overlaps with communication.</td></tr><tr><td>membw</td><td>Streaming access on large contiguous buffers -- the best case for the memory system. Random or strided access patterns will be far slower and are not measured. / Cache behaviour is deliberately excluded by sizing buffers past L2.</td></tr><tr><td>pcie</td><td>Bulk transfer of large pinned buffers. Small-transfer latency and the per-call overhead that dominates inference serving are not measured. / Host-to-device and device-to-host only. Does not establish whether device-to-device traffic takes a peer path -- see the P2P section for that.</td></tr><tr><td>nccl</td><td>Collectives in isolation on an otherwise idle node. Real training overlaps them with compute, so these are an upper bound on what a training job will see. / Only the configured message sizes and collectives. Small-message latency behaviour differs qualitatively from large-message bandwidth behaviour.</td></tr><tr><td>p2p</td><td>The verdict is inferred from a bandwidth ratio, not read from a register. It is stated with a confidence level for that reason.</td></tr><tr><td>monitor</td><td>NVML&amp;#x27;s PCIe counter is a ~20 ms windowed average, so it cannot be integrated to a transfer volume and its peaks are 20 ms peaks, not link capacity. / &amp;#x27;busy_pct&amp;#x27; is the fraction of time at least one kernel was resident. It is not SM occupancy; a card can read 100% busy while using a few percent of its SMs.</td></tr></tbody></table><h3>Not run in this session</h3><table><thead><tr><th>Module</th><th>Why</th><th>Consequence</th></tr></thead><tbody><tr><td>host</td><td>not in the configured module list</td><td>Nothing in this report speaks to host.</td></tr></tbody></table><h3>Outside this tool entirely</h3><ul class="plain"><li>Sustained multi-hour thermal behaviour. Runs here are minutes long; a datacentre job is hours, and clocks drop over that horizon.</li><li>Anything across nodes. This tool measures one node. InfiniBand/RoCE fabric, NCCL tuning across hosts, and rail topology are entirely out of scope.</li><li>Numerical accuracy. Throughput is measured, correctness of the results is not. A fast kernel producing wrong values would pass every test here.</li><li>Storage and dataset pipeline throughput, except indirectly via data_time in training-log parsing.</li><li>Performance per watt as a design conclusion. Power is sampled, but no controlled efficiency comparison is made.</li></ul></section><section><h2>Raw artifacts</h2><p class="lede">9 files, 0.49 MB. Every number in this report was derived from one of these, and every hash lets a reader confirm the file has not changed since.</p><table><thead><tr><th>File</th><th class="num">Bytes</th><th class="num">Lines</th><th>md5 (first 16)</th><th>Produced by</th></tr></thead><tbody><tr><td>raw/environment.json</td><td class="num">2,144</td><td class="num">71</td><td><span class="mono">5f2c9a1e8b4d7c30</span></td><td>probe.compat</td></tr><tr><td>raw/topology.json</td><td class="num">1,022</td><td class="num">34</td><td><span class="mono">9d31ba77e0c45f81</span></td><td>nvidia-smi topo -m</td></tr><tr><td>raw/idle_baseline.csv</td><td class="num">4,806</td><td class="num">18</td><td><span class="mono">17aa04c9f3b28d6e</span></td><td>monitor.nvml (control group)</td></tr><tr><td>raw/monitor.csv</td><td class="num">402,918</td><td class="num">1,447</td><td><span class="mono">c40e7b2159af83dd</span></td><td>monitor.nvml</td></tr><tr><td>raw/flops.json</td><td class="num">1,388</td><td class="num">52</td><td><span class="mono">aa19c3e4d70b5182</span></td><td>bench.flops_torch</td></tr><tr><td>raw/membw.json</td><td class="num">1,204</td><td class="num">48</td><td><span class="mono">b7c250af9e3168d4</span></td><td>bench.membw_torch</td></tr><tr><td>raw/pcie.json</td><td class="num">1,566</td><td class="num">55</td><td><span class="mono">3e8f10ca47bb92d5</span></td><td>bench.pcie_torch</td></tr><tr><td>raw/nccl.json</td><td class="num">4,902</td><td class="num">168</td><td><span class="mono">d21b6effa0c39471</span></td><td>bench.nccl_torch</td></tr><tr><td>raw/p2p.json</td><td class="num">2,263</td><td class="num">66</td><td><span class="mono">6cf3aa81b429d05e</span></td><td>probe.p2p</td></tr></tbody></table></section>
+
+<footer>Generated by nodebench. Every figure above is a measurement of this node under the stated conditions; none is a vendor specification.</footer>
+</div>
+<script>
+/* The only script in the file: a theme toggle. No libraries, no chart runtime --
+   every mark above is CSS, so the report renders with JS disabled. */
+(function () {
+  var r = document.documentElement, b = document.getElementById('tt');
+  b.addEventListener('click', function () {
+    var dark = r.getAttribute('data-theme') === 'dark' ||
+      (r.getAttribute('data-theme') !== 'light' &&
+       window.matchMedia('(prefers-color-scheme: dark)').matches);
+    r.setAttribute('data-theme', dark ? 'light' : 'dark');
+  });
+})();
+</script>
+</body>
+</html>

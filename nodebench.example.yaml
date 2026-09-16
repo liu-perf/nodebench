@@ -1,0 +1,96 @@
+# nodebench configuration
+#
+# Everything machine-specific lives here. Nothing in the source tree hardcodes a
+# path, a GPU id, a hostname or a registry. Copy this file, edit it, pass it with
+# `nodebench run -c my-node.yaml`.
+#
+# Running with no config at all is fine -- every field below has a default, and
+# NUMA groups / GPU sets are auto-detected from the topology.
+
+node:
+  # Free-text label that appears in the report. Use whatever you like; nodebench
+  # never reads the real hostname into the report unless you put it here.
+  label: "my-8gpu-node"
+  # Optional. Left empty it simply does not appear in the report.
+  vendor: ""
+  notes: ""
+
+paths:
+  # All output goes here: raw CSVs, JSON results, the HTML report, the manifest.
+  workdir: "./nodebench_out"
+  # Where `nodebench setup --native` clones and builds the C++ toolchain.
+  third_party: "./third_party"
+
+topology:
+  # Leave null to auto-detect from `nvidia-smi topo -m`.
+  # Set explicitly if auto-detection is wrong, e.g. [[0,1,2,3,4],[5,6,7]]
+  numa_groups: null
+
+bench:
+  # Which modules to run. Remove one to skip it.
+  modules: [flops, membw, pcie, nccl]
+
+  # "torch"  -> pure PyTorch, zero compilation  (default, 5 minutes)
+  # "native" -> C++ toolchain, needs `nodebench setup --native` first
+  # "both"   -> run both and cross-check the two measurements against each other
+  backend: "torch"
+
+  flops:
+    size: 8192          # square GEMM edge length
+    dtypes: [fp32, tf32, fp16, bf16, fp8]
+    iters: 30
+    warmup: 10
+
+  membw:
+    elements: 268435456  # 2^28 -> ~1 GiB per fp32 buffer
+    iters: 30
+    warmup: 10
+
+  pcie:
+    bytes: 1073741824    # 1 GiB per transfer
+    iters: 20
+    warmup: 5
+
+  nccl:
+    # Message sizes to sweep, in bytes.
+    sizes: [16777216, 67108864, 268435456, 1073741824]
+    collectives: [all_reduce, all_gather, reduce_scatter, all_to_all]
+    iters: 20
+    warmup: 5
+    # GPU sets to sweep. null -> auto-generate 1 / 2 / 4-same-NUMA /
+    # 4-cross-NUMA / all, from the detected topology.
+    gpu_sets: null
+
+monitor:
+  enabled: true
+  interval_s: 1.0
+  # Seconds of idle sampling before the first workload starts. This is the
+  # control group: it establishes the noise floor so you can prove that what you
+  # measured later is signal. Do not set this to 0.
+  idle_baseline_s: 12
+  # SM% at or above which a GPU counts as "busy" when auto-binning phases.
+  busy_sm_threshold: 90
+
+report:
+  title: "Node benchmark report"
+  # Emit the md5/bytes/lines manifest of every raw artifact.
+  manifest: true
+  # Auto-generate the "not covered in this run" section.
+  caveats: true
+
+# ---------------------------------------------------------------------------
+# Optional heavy recipes. Not part of the default run.
+# ---------------------------------------------------------------------------
+recipes:
+  llm_lora:
+    enabled: false
+    model: "Qwen/Qwen3-8B"
+    batch_per_gpu: 4
+    seq_len: 1024
+    lora_r: 16
+    lora_alpha: 32
+    steps: 30
+    warmup_steps: 8
+    # Synthetic random token ids -- no dataset download, no licensing question,
+    # and the step time is identical to real data once the loader is warm.
+    synthetic: true

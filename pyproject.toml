@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nodebench"
+version = "0.1.0"
+description = "Benchmark a whole multi-GPU training node in 5 minutes. Zero compilation, zero datasets."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "nodebench contributors" }]
+keywords = ["gpu", "benchmark", "nccl", "pcie", "multi-gpu", "scaling", "p2p", "cuda"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: System :: Benchmark",
+]
+
+# Deliberately tiny. torch is NOT declared here: users already have a specific
+# CUDA build installed, and pulling a different one would break their machine.
+dependencies = [
+    "nvidia-ml-py>=12.0",
+    "PyYAML>=5.4",
+]
+
+[project.optional-dependencies]
+recipes = ["transformers>=4.40", "peft>=0.10", "accelerate>=0.30"]
+dev = ["pytest>=7", "ruff>=0.4"]
+
+[project.scripts]
+nodebench = "nodebench.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/liu-perf/nodebench"
+Documentation = "https://github.com/liu-perf/nodebench/tree/main/docs"
+
+[tool.setuptools.packages.find]
+include = ["nodebench*"]
+
+[tool.setuptools.package-data]
+"nodebench.report" = ["templates/*.html"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+# Correctness rules plus import ordering, and nothing else. Left at ruff's
+# defaults this repo emits ~460 findings, almost all of them style opinions
+# (f-string modernisation, timezone-aware datetimes, implicit concatenation),
+# and a lint run that prints 460 lines is a lint run nobody reads. The rules
+# below are the ones where a hit is a bug or a diff-noise source.
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "B", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+# F821: these two modules end their timing helper with `del a, b` to free VRAM
+# before the next size. ruff sees the delete and marks the *earlier* closure
+# reference as unbound, but the closure has already been called by then.
+"nodebench/bench/flops_torch.py" = ["F821"]
+"nodebench/bench/membw_torch.py" = ["F821"]
+# B023: the collective lambdas close over `buf`/`src`/`dst` from the loop, but
+# each one is created and consumed inside the same iteration, so late binding
+# never gets a chance to bite.
+"nodebench/bench/nccl_torch.py" = ["B023"]

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="__THEME__">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<style>
+/* ---------------------------------------------------------------------------
+   Palette. Roles only in the body below; hex lives here so light/dark swap in
+   one place. Values are the validated reference palette (categorical slots 1-3
+   clear the all-pairs CVD and normal-vision floors in both modes).
+   --------------------------------------------------------------------------- */
+:root {
+  color-scheme: light;
+  --page:            #f9f9f7;
+  --surface-1:       #fcfcfb;
+  --text-primary:    #0b0b0b;
+  --text-secondary:  #52514e;
+  --text-muted:      #898781;
+  --grid:            #e1e0d9;
+  --axis:            #c3c2b7;
+  --border:          rgba(11,11,11,0.10);
+  --series-1:        #2a78d6;
+  --series-2:        #eb6834;
+  --series-3:        #1baf7a;
+  --track:           #e1e0d9;
+  --good:            #0ca30c;
+  --warning:         #fab219;
+  --serious:         #ec835a;
+  --critical:        #d03b3b;
+  --good-text:       #006300;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page:           #0d0d0d;
+    --surface-1:      #1a1a19;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --grid:           #2c2c2a;
+    --axis:           #383835;
+    --border:         rgba(255,255,255,0.10);
+    --series-1:       #3987e5;
+    --series-2:       #d95926;
+    --series-3:       #199e70;
+    --track:          #2c2c2a;
+    --good-text:      #0ca30c;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page:           #0d0d0d;
+  --surface-1:      #1a1a19;
+  --text-primary:   #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted:     #898781;
+  --grid:           #2c2c2a;
+  --axis:           #383835;
+  --border:         rgba(255,255,255,0.10);
+  --series-1:       #3987e5;
+  --series-2:       #d95926;
+  --series-3:       #199e70;
+  --track:          #2c2c2a;
+  --good-text:      #0ca30c;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 32px 20px 80px;
+  background: var(--page); color: var(--text-primary);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.wrap { max-width: 1080px; margin: 0 auto; }
+
+header.top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+h1 { font-size: 26px; line-height: 1.25; margin: 0 0 4px; font-weight: 650; }
+.subtitle { color: var(--text-secondary); font-size: 14px; margin: 0; }
+.themebtn {
+  border: 1px solid var(--border); background: var(--surface-1); color: var(--text-secondary);
+  border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap;
+}
+.themebtn:hover { color: var(--text-primary); }
+
+section { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; margin: 20px 0; }
+h2 { font-size: 17px; margin: 0 0 4px; font-weight: 650; }
+h3 { font-size: 14px; margin: 20px 0 6px; font-weight: 600; color: var(--text-secondary); }
+.lede { color: var(--text-secondary); font-size: 13.5px; margin: 0 0 14px; max-width: 78ch; }
+p.note { color: var(--text-secondary); font-size: 13px; margin: 10px 0 0; max-width: 82ch; }
+p.note code, code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; background: var(--page); padding: 1px 5px; border-radius: 4px; }
+
+/* Stat tiles -- a headline number is not a chart; do not plot it. */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 2px; }
+.tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.tile .label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+.tile .value { font-size: 28px; font-weight: 650; line-height: 1.15; margin-top: 4px; }
+.tile .unit { font-size: 14px; font-weight: 500; color: var(--text-secondary); margin-left: 3px; }
+.tile .sub { font-size: 12.5px; color: var(--text-secondary); margin-top: 3px; }
+
+/* Horizontal bar meters. Thin marks, 4px rounded data end anchored at zero. */
+.meters { margin-top: 6px; }
+.meter { display: grid; grid-template-columns: 190px 1fr 96px; align-items: center; gap: 12px; padding: 5px 0; }
+.meter .mlabel { font-size: 13px; color: var(--text-secondary); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meter .mtrack { position: relative; height: 14px; background: var(--track); border-radius: 4px; overflow: hidden; }
+.meter .mfill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 0 4px 4px 0; background: var(--series-1); }
+.meter .mfill.s2 { background: var(--series-2); }
+.meter .mfill.good { background: var(--good); }
+.meter .mfill.warning { background: var(--warning); }
+.meter .mfill.serious { background: var(--serious); }
+.meter .mfill.critical { background: var(--critical); }
+.meter .mref { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--axis); }
+.meter .mval { font-size: 13px; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.meterhead { display: grid; grid-template-columns: 190px 1fr 96px; gap: 12px; font-size: 12px; color: var(--text-muted); padding-bottom: 4px; }
+.meterhead span:nth-child(1) { text-align: right; }
+
+/* Legend -- present whenever two or more series share an axis. */
+.legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 10px 0 6px; font-size: 12.5px; color: var(--text-secondary); }
+.legend .k { display: inline-flex; align-items: center; gap: 6px; }
+.legend .sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-top: 8px; }
+th { text-align: left; font-weight: 600; color: var(--text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: .03em; padding: 7px 10px 7px 0; border-bottom: 1px solid var(--axis); white-space: nowrap; }
+td { padding: 8px 10px 8px 0; border-bottom: 1px solid var(--grid); vertical-align: top; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; padding-right: 14px; }
+tr:last-child td { border-bottom: none; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+
+/* Status: always icon + label, never color alone. */
+.pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.pill .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; }
+.pill.good { color: var(--good-text); } .pill.good .dot { background: var(--good); }
+.pill.warning { color: var(--text-primary); } .pill.warning .dot { background: var(--warning); }
+.pill.serious { color: var(--text-primary); } .pill.serious .dot { background: var(--serious); }
+.pill.critical { color: var(--critical); } .pill.critical .dot { background: var(--critical); }
+.pill.muted { color: var(--text-muted); } .pill.muted .dot { background: var(--axis); }
+
+.callout { border-left: 3px solid var(--axis); padding: 10px 0 10px 14px; margin: 12px 0; font-size: 13.5px; color: var(--text-secondary); }
+.callout strong { color: var(--text-primary); }
+.callout.good { border-left-color: var(--good); }
+.callout.warning { border-left-color: var(--warning); }
+.callout.serious { border-left-color: var(--serious); }
+.callout.critical { border-left-color: var(--critical); }
+
+ul.plain { margin: 8px 0 0; padding-left: 18px; color: var(--text-secondary); font-size: 13.5px; }
+ul.plain li { margin: 5px 0; }
+
+details { margin-top: 10px; }
+summary { cursor: pointer; font-size: 13px; color: var(--text-secondary); }
+summary:hover { color: var(--text-primary); }
+
+footer { color: var(--text-muted); font-size: 12.5px; margin-top: 28px; text-align: center; }
+
+@media print { body { background: #fff; } section { break-inside: avoid; } .themebtn { display: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div>
+    <h1>__TITLE__</h1>
+    <p class="subtitle">__SUBTITLE__</p>
+  </div>
+  <button class="themebtn" id="tt" type="button">Theme</button>
+</header>
+
+__BODY__
+
+<footer>__FOOTER__</footer>
+</div>
+<script>
+/* The only script in the file: a theme toggle. No libraries, no chart runtime --
+   every mark above is CSS, so the report renders with JS disabled. */
+(function () {
+  var r = document.documentElement, b = document.getElementById('tt');
+  b.addEventListener('click', function () {
+    var dark = r.getAttribute('data-theme') === 'dark' ||
+      (r.getAttribute('data-theme') !== 'light' &&
+       window.matchMedia('(prefers-color-scheme: dark)').matches);
+    r.setAttribute('data-theme', dark ? 'light' : 'dark');
+  });
+})();
+</script>
+</body>
+</html>

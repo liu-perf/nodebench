@@ -1,0 +1,35 @@
+# nodebench outputs. A real run's report carries a node label, a driver version,
+# a card count and a timestamp -- together those identify a specific machine, so
+# nothing from a real run belongs in the repository. Only examples/ is exempt,
+# and everything in there is synthetic by construction.
+nodebench_out/
+run*/
+results/
+raw/
+*.csv
+*.html
+!examples/*.html
+!nodebench/report/templates/*.html
+
+# native toolchain (cloned + built by `nodebench setup --native`)
+third_party/
+build/
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+.pytest_cache/
+.ruff_cache/
+
+# editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# never commit private notes
+NOTES.private.md

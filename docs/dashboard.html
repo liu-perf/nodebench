@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seven-part series — key numbers dashboard</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page:            #f9f9f7;
+    --surface-1:       #fcfcfb;
+    --text-primary:    #0b0b0b;
+    --text-secondary:  #52514e;
+    --text-muted:      #898781;
+    --gridline:        #e1e0d9;
+    --baseline:        #c3c2b7;
+    --border:          rgba(11,11,11,0.10);
+    --delta-good:      #006300;
+    --seq-150:         #b7d3f6;
+    --seq-250:         #86b6ef;
+    --seq-400:         #3987e5;
+    --seq-450:         #2a78d6;
+    --seq-500:         #256abf;
+    --seq-550:         #1c5cab;
+    --seq-600:         #184f95;
+    --dumbbell-before: var(--seq-250);
+    --dumbbell-after:  var(--seq-550);
+    --dumbbell-line:   var(--seq-150);
+    --meter-track:     var(--seq-250);
+    --meter-fill:      var(--seq-550);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page:            #0d0d0d;
+      --surface-1:       #1a1a19;
+      --text-primary:    #ffffff;
+      --text-secondary:  #c3c2b7;
+      --text-muted:      #898781;
+      --gridline:        #2c2c2a;
+      --baseline:        #383835;
+      --border:          rgba(255,255,255,0.10);
+      --delta-good:      #0ca30c;
+      --dumbbell-before: var(--seq-600);
+      --dumbbell-after:  var(--seq-400);
+      --dumbbell-line:   var(--seq-600);
+      --meter-track:     rgba(24, 79, 149, 0.55);
+      --meter-fill:      var(--seq-400);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page:            #0d0d0d;
+    --surface-1:       #1a1a19;
+    --text-primary:    #ffffff;
+    --text-secondary:  #c3c2b7;
+    --text-muted:      #898781;
+    --gridline:        #2c2c2a;
+    --baseline:        #383835;
+    --border:          rgba(255,255,255,0.10);
+    --delta-good:      #0ca30c;
+    --dumbbell-before: var(--seq-600);
+    --dumbbell-after:  var(--seq-400);
+    --dumbbell-line:   var(--seq-600);
+    --meter-track:     rgba(24, 79, 149, 0.55);
+    --meter-fill:      var(--seq-400);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 24px 20px 64px;
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+
+  header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 28px; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  header p { margin: 0; color: var(--text-secondary); font-size: 14px; max-width: 62ch; line-height: 1.5; }
+  #theme-toggle {
+    flex: none;
+    font: inherit; font-size: 13px;
+    background: var(--surface-1); color: var(--text-primary);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 7px 12px; cursor: pointer;
+  }
+  #theme-toggle:hover { border-color: var(--baseline); }
+
+  .note {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 16px; font-size: 13px; color: var(--text-secondary); line-height: 1.6;
+    margin-bottom: 32px;
+  }
+  .note strong { color: var(--text-primary); }
+
+  section { margin-bottom: 40px; }
+  h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin: 0 0 4px; }
+  .section-sub { font-size: 13px; color: var(--text-secondary); margin: 0 0 16px; }
+  .section-sub.tight { margin: 10px 0 0; }
+
+  /* KPI row */
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .kpi {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px;
+  }
+  .kpi .label { font-size: 12.5px; color: var(--text-secondary); margin-bottom: 10px; line-height: 1.4; min-height: 34px; }
+  .kpi .value { font-size: 30px; font-weight: 600; line-height: 1; margin-bottom: 8px; }
+  .kpi .delta { font-size: 12.5px; color: var(--delta-good); font-weight: 600; }
+  .kpi .delta.neutral { color: var(--text-secondary); }
+  .kpi .source { font-size: 11px; color: var(--text-muted); margin-top: 8px; }
+
+  /* Dumbbell small multiples */
+  .legend-row { display: flex; gap: 18px; align-items: center; margin-bottom: 14px; font-size: 12.5px; color: var(--text-secondary); }
+  .legend-row .swatch { display: inline-flex; align-items: center; gap: 6px; }
+  .legend-row .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .dot.before { background: var(--dumbbell-before); }
+  .dot.after  { background: var(--dumbbell-after); }
+
+  .dumbbell-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .dumbbell-card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px;
+  }
+  .dumbbell-card h3 { font-size: 13px; margin: 0 0 14px; font-weight: 600; }
+  .dumbbell-svg { width: 100%; height: 76px; display: block; }
+  .dumbbell-svg line.track { stroke: var(--gridline); stroke-width: 2; }
+  .dumbbell-svg line.span { stroke: var(--dumbbell-line); stroke-width: 3; }
+  .dumbbell-svg circle { stroke: var(--surface-1); stroke-width: 2; cursor: pointer; }
+  .dumbbell-svg circle.before { fill: var(--dumbbell-before); }
+  .dumbbell-svg circle.after  { fill: var(--dumbbell-after); }
+  .dumbbell-svg text.endlabel { font-size: 11px; fill: var(--text-primary); font-weight: 600; }
+  .dumbbell-svg text.axis { font-size: 10px; fill: var(--text-muted); }
+  .dumbbell-card .caption { font-size: 12px; color: var(--text-secondary); margin-top: 6px; }
+  .dumbbell-card .caption .up { color: var(--delta-good); font-weight: 600; }
+
+  /* Meter bars */
+  .meter-list { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
+  .meter-row { display: grid; grid-template-columns: 200px 1fr 90px; align-items: center; gap: 12px; padding: 10px 0; }
+  .meter-row + .meter-row { border-top: 1px solid var(--gridline); }
+  .meter-row .name { font-size: 13px; color: var(--text-primary); }
+  .meter-row .name small { display: block; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .meter-track { position: relative; height: 20px; background: var(--meter-track); border-radius: 4px; }
+  .meter-fill { position: absolute; left: 0; top: 0; height: 100%; background: var(--meter-fill); border-radius: 4px; cursor: pointer; }
+  .meter-row .value { font-size: 13px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+
+  details.table-view { margin-top: 14px; }
+  details.table-view summary { cursor: pointer; font-size: 12.5px; color: var(--text-secondary); }
+  details.table-view summary:hover { color: var(--text-primary); }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12.5px; }
+  table caption { text-align: left; font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--gridline); }
+  th { color: var(--text-muted); font-weight: 600; text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.03em; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .cmp-table { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px 6px; }
+  .cmp-table table { margin-top: 0; }
+
+  footer { font-size: 12px; color: var(--text-muted); border-top: 1px solid var(--gridline); padding-top: 16px; line-height: 1.7; }
+  footer a { color: var(--text-secondary); }
+
+  #tooltip {
+    position: fixed; pointer-events: none; z-index: 20;
+    background: var(--text-primary); color: var(--surface-1);
+    font-size: 12px; padding: 6px 10px; border-radius: 6px;
+    opacity: 0; transform: translate(-50%, -100%); transition: opacity 0.1s;
+    white-space: nowrap;
+  }
+  #tooltip.show { opacity: 1; }
+
+  @media (max-width: 760px) {
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .dumbbell-grid { grid-template-columns: 1fr; }
+    .meter-row { grid-template-columns: 1fr; }
+    .meter-row .value { text-align: left; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div>
+    <h1>Seven-part series — key numbers dashboard</h1>
+    <p>The headline numbers from nodebench → benchdoctor → tracedoctor → regressiondoctor → fitdoctor → telemetrydoctor → servedoctor, in one page. Every value below is copied from a real command run or a real test suite, not estimated — sources are named on each chart.</p>
+  </div>
+  <button id="theme-toggle" type="button" aria-label="Toggle dark mode">🌓 Theme</button>
+</header>
+
+<div class="note">
+  <strong>No simulated numbers on this page.</strong> The P2P ratio, the false-positive counts, the launch/exec ratios, the cross-NUMA bandwidth drops, the KV-cache overestimate and the two utilisation readings all come from a real GPU node or a real pytest run; the fixture-based test counts come from re-running each project's suite locally on 2026-09-01. Where a number was an assumption rather than a measurement (e.g. regressiondoctor's default noise floor, or fitdoctor's framework-overhead range), that is called out in the project's own docs — fitdoctor goes further and tags every figure it prints with a <code>basis</code> of <code>measured</code> / <code>spec</code> / <code>derived</code> / <code>assumed</code>, telemetrydoctor tags every column with which arithmetic it supports at all, and servedoctor tags every file with what may be concluded from it and refuses to print a P99 the sample cannot bound. Nothing is smoothed over here.
+</div>
+
+<section id="kpis">
+  <h2>Headline numbers</h2>
+  <p class="section-sub">One tile per project, most-recently-measured value first.</p>
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="label">P2P bandwidth ratio after enabling the peer path (nodebench)</div>
+      <div class="value">0.72</div>
+      <div class="delta">↑ +227% vs 0.22 pre-fix</div>
+      <div class="source">source: nodebench — the P2P writeup</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Self-scan false positives after the fix (benchdoctor)</div>
+      <div class="value">0</div>
+      <div class="delta">↓ from 13 on first pass</div>
+      <div class="source">source: benchdoctor — the 13→0 writeup</div>
+    </div>
+    <div class="kpi">
+      <div class="label">TD003 launch/exec ratio, noise case, after median fix (tracedoctor)</div>
+      <div class="value">1.5×</div>
+      <div class="delta">↓ from 73× with mean-based calc</div>
+      <div class="source">source: tracedoctor — from notes to rules</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Cross-tool PCIe bandwidth agreement, same GPU</div>
+      <div class="value">within 0.1%</div>
+      <div class="delta neutral">26.46–26.48 vs 26.48 GB/s</div>
+      <div class="source">source: nodebench pcie_torch.py vs tracedoctor TD004</div>
+    </div>
+    <div class="kpi">
+      <div class="label">KV-cache overestimate on a GQA model before the field fix (fitdoctor)</div>
+      <div class="value">4.0×</div>
+      <div class="delta neutral">16.00 → 4.00 GiB; predicted and measured agree to ±0.0000%</div>
+      <div class="source">source: fitdoctor examples/verify_on_device.py, real allocation on one RTX 5060 Ti</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Delivered throughput behind two identical GPU-utilisation readings (telemetrydoctor)</div>
+      <div class="value">978×</div>
+      <div class="delta neutral">29.6% / 0.047 TFLOPS vs 27.9% / 45.6 TFLOPS — 1.7 points apart</div>
+      <div class="source">source: telemetrydoctor examples/verify_on_device.py, one RTX 5060 Ti, three consecutive runs</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Tail latency reported for the same server by a closed-loop harness (servedoctor)</div>
+      <div class="value">16.5&times;</div>
+      <div class="delta neutral">q99 0.084s vs 1.39s at the same configured rate &mdash; maxima only 1.8&times; apart</div>
+      <div class="source">source: servedoctor examples/coordinated_omission.py, pure stdlib, no GPU, four consecutive runs</div>
+    </div>
+  </div>
+</section>
+
+<section id="dumbbells">
+  <h2>Before → after</h2>
+  <p class="section-sub">Four fixes that were only provable because the "before" number was actually measured first.</p>
+  <div class="legend-row">
+    <span class="swatch"><span class="dot before"></span> before</span>
+    <span class="swatch"><span class="dot after"></span> after</span>
+  </div>
+  <div class="dumbbell-grid" id="dumbbell-grid"></div>
+  <details class="table-view">
+    <summary>Table view</summary>
+    <table>
+      <caption>Same four before/after pairs as the charts above.</caption>
+      <thead><tr><th>Metric</th><th class="num">Before</th><th class="num">After</th><th>Source</th></tr></thead>
+      <tbody>
+        <tr><td>P2P bandwidth ratio (all-reduce busbw / H2D)</td><td class="num">0.22</td><td class="num">0.72</td><td>nodebench — the P2P writeup</td></tr>
+        <tr><td>benchdoctor self-scan false positives</td><td class="num">13</td><td class="num">0</td><td>benchdoctor — the 13→0 writeup</td></tr>
+        <tr><td>TD003 launch/exec ratio, noise case</td><td class="num">73×</td><td class="num">1.5×</td><td>tracedoctor — from notes to rules</td></tr>
+        <tr><td>KV cache for an 8B GQA model, batch 8 × 4096 tokens</td><td class="num">16.00 GiB</td><td class="num">4.00 GiB</td><td>fitdoctor — KV cache and GQA</td></tr>
+      </tbody>
+    </table>
+  </details>
+</section>
+
+<section id="topology">
+  <h2>Cross-NUMA scaling efficiency</h2>
+  <p class="section-sub">Same 8-GPU node, same benchmark, cards split across two CPU sockets instead of one. Bandwidth drop relative to the same-NUMA baseline (scale: 0–40%).</p>
+  <div class="meter-list" id="meter-list"></div>
+  <details class="table-view">
+    <summary>Table view</summary>
+    <table>
+      <caption>Absolute before/after values behind the percentages above.</caption>
+      <thead><tr><th>Link</th><th class="num">Same-NUMA</th><th class="num">Cross-NUMA</th><th class="num">Drop</th></tr></thead>
+      <tbody>
+        <tr><td>NCCL alltoall (avg busbw)</td><td class="num">23.0 GB/s</td><td class="num">14.2 GB/s</td><td class="num">−38.1%</td></tr>
+        <tr><td>NCCL all_reduce (avg busbw)</td><td class="num">50.3 GB/s</td><td class="num">32.5 GB/s</td><td class="num">−35.4%</td></tr>
+        <tr><td>NCCL all_gather (avg busbw)</td><td class="num">49.0 GB/s</td><td class="num">32.2 GB/s</td><td class="num">−34.3%</td></tr>
+        <tr><td>Device↔device read (nvbandwidth SUM)</td><td class="num">3213.7 GB/s</td><td class="num">2467.2 GB/s</td><td class="num">−23.2%</td></tr>
+      </tbody>
+    </table>
+  </details>
+  <p class="section-sub tight">source: nodebench — the topology writeup</p>
+</section>
+
+<section id="tests">
+  <h2>Test coverage across the seven tools</h2>
+  <p class="section-sub">Re-run locally on 2026-09-01 (<code>pytest -q</code> in each repo): 739 tests, none of them touching a GPU. Each project keeps the version that was wrong, plus a test asserting it is still wrong — that is what the last column is about.</p>
+  <div class="cmp-table">
+    <table>
+      <thead><tr><th>Project</th><th class="num">Tests passing</th><th>What the tests caught</th></tr></thead>
+      <tbody>
+        <tr><td>nodebench</td><td class="num">31</td><td>parsing and cross-check logic for the four measurement modules; the 5%/15% disagreement bars between the PyTorch and native implementations</td></tr>
+        <tr><td>benchdoctor</td><td class="num">39</td><td>13 → 0 self-scan false positives (fixed rule scope, not a smarter regex)</td></tr>
+        <tr><td>tracedoctor</td><td class="num">16</td><td>6 findings across 6 fixture captures, 0 on the healthy baseline (<code>case_good_matmul</code>)</td></tr>
+        <tr><td>regressiondoctor</td><td class="num">19</td><td>naive 5% threshold flagged pure noise as a regression → fixed to a noise-floor-aware bar; all 3 synthetic fixture pairs (noise / regression / improvement) classified correctly</td></tr>
+        <tr><td>fitdoctor</td><td class="num">123</td><td>4 of them assert the naive KV-cache formula is <em>still</em> 4× too big on GQA (and still correct on MHA — which is why the bug survived); 1 asserts the cross-card fp8→fp4 ratios are <em>still</em> inconsistent, so <code>NO_DERIVATION</code> would fail loudly the day that changes</td></tr>
+        <tr><td>telemetrydoctor</td><td class="num">195</td><td>6 assert the naive whole-file aggregation is <em>still</em> wrong — per-card peaks summed give 84.64 GB/s against a steady-state 3.86 (21.9× over), and summing a percentage across 8 cards still returns 239.47%; 3 more pin bugs found <em>inside</em> this library by its own tests: a cross-check that was an algebraic identity, a separability floor below what a uniform distribution scores, and a repeat count that was not scoped to the active phases</td></tr>
+        <tr><td>servedoctor</td><td class="num">316</td><td>10 assert the naive summary is <em>still</em> wrong &mdash; it prints a P99 where the exact order-statistic interval has no upper bound inside the sample, and a token rate whose value moves with prompt length; 2 of those are controls asserting the request count and the arithmetic mean <em>do</em> agree. 6 more pin bugs found <em>inside</em> this library: an open/closed-loop detector that scored a by-construction closed loop into its own inconclusive band, a steady-state window referenced to a queue spike instead of the median, a utilisation clamp that produced a 398-second queueing floor for a run whose whole tail was 13 seconds, and a Little's Law check that was an identity</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<footer>
+  Part of a seven-part series: <a href="https://github.com/liu-perf/nodebench">nodebench</a> (measure) →
+  <a href="https://github.com/liu-perf/benchdoctor">benchdoctor</a> (static checks) →
+  <a href="https://github.com/liu-perf/tracedoctor">tracedoctor</a> (dynamic checks) →
+  <a href="https://github.com/liu-perf/regressiondoctor">regressiondoctor</a> (regression checks over time) →
+  <a href="https://github.com/liu-perf/fitdoctor">fitdoctor</a> (what the number should have been) → <a href="https://github.com/liu-perf/telemetrydoctor">telemetrydoctor</a> (what arithmetic the number supports) →
+  <a href="https://github.com/liu-perf/servedoctor">servedoctor</a> (whether the number is about the server or the load generator).<br>
+  This page is a static summary; it does not re-run any benchmark. If a number here ever disagrees with the linked repo, the repo is right.
+</footer>
+
+</div>
+
+<div id="tooltip" aria-hidden="true"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var root = document.documentElement;
+  var toggle = document.getElementById("theme-toggle");
+  var stored = null;
+  try { stored = localStorage.getItem("dashboard-theme"); } catch (e) {}
+  if (stored === "light" || stored === "dark") root.setAttribute("data-theme", stored);
+
+  toggle.addEventListener("click", function () {
+    var current = root.getAttribute("data-theme");
+    var next = current === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try { localStorage.setItem("dashboard-theme", next); } catch (e) {}
+  });
+
+  var tooltip = document.getElementById("tooltip");
+  function showTip(el, text) {
+    tooltip.textContent = text;
+    var r = el.getBoundingClientRect();
+    tooltip.style.left = (r.left + r.width / 2) + "px";
+    tooltip.style.top = (r.top - 8) + "px";
+    tooltip.classList.add("show");
+  }
+  function hideTip() { tooltip.classList.remove("show"); }
+  function wireTip(el, text) {
+    el.setAttribute("tabindex", "0");
+    el.addEventListener("mouseenter", function () { showTip(el, text); });
+    el.addEventListener("mouseleave", hideTip);
+    el.addEventListener("focus", function () { showTip(el, text); });
+    el.addEventListener("blur", hideTip);
+  }
+
+  // ---- Dumbbell charts ----
+  var dumbbells = [
+    { title: "P2P bandwidth ratio (nodebench)", before: 0.22, after: 0.72, domainMax: 1,
+      fmt: function (v) { return v.toFixed(2); }, unit: "ratio" },
+    { title: "benchdoctor self-scan false positives", before: 13, after: 0, domainMax: 14,
+      fmt: function (v) { return String(v); }, unit: "false positives" },
+    { title: "TD003 launch/exec ratio, noise case", before: 73, after: 1.5, domainMax: 80,
+      fmt: function (v) { return v + "×"; }, unit: "ratio" },
+    { title: "KV cache, 8B GQA model (fitdoctor)", before: 16, after: 4, domainMax: 18,
+      fmt: function (v) { return v.toFixed(2); }, unit: "GiB" }
+  ];
+
+  var grid = document.getElementById("dumbbell-grid");
+  dumbbells.forEach(function (d) {
+    var card = document.createElement("div");
+    card.className = "dumbbell-card";
+
+    var h3 = document.createElement("h3");
+    h3.textContent = d.title;
+    card.appendChild(h3);
+
+    var W = 280, H = 76, padL = 10, padR = 10, y = 40;
+    var scale = function (v) { return padL + (v / d.domainMax) * (W - padL - padR); };
+
+    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    svg.setAttribute("class", "dumbbell-svg");
+    svg.setAttribute("preserveAspectRatio", "xMinYMid meet");
+
+    var track = document.createElementNS(svg.namespaceURI, "line");
+    track.setAttribute("class", "track");
+    track.setAttribute("x1", padL); track.setAttribute("x2", W - padR);
+    track.setAttribute("y1", y); track.setAttribute("y2", y);
+    svg.appendChild(track);
+
+    var x1 = scale(d.before), x2 = scale(d.after);
+    var span = document.createElementNS(svg.namespaceURI, "line");
+    span.setAttribute("class", "span");
+    span.setAttribute("x1", x1); span.setAttribute("x2", x2);
+    span.setAttribute("y1", y); span.setAttribute("y2", y);
+    svg.appendChild(span);
+
+    [["before", d.before, x1, -14], ["after", d.after, x2, 22]].forEach(function (pair) {
+      var cls = pair[0], val = pair[1], cx = pair[2], dy = pair[3];
+      var c = document.createElementNS(svg.namespaceURI, "circle");
+      c.setAttribute("class", cls);
+      c.setAttribute("cx", cx); c.setAttribute("cy", y); c.setAttribute("r", 7);
+      svg.appendChild(c);
+      wireTip(c, cls + ": " + d.fmt(val) + " " + d.unit);
+
+      var t = document.createElementNS(svg.namespaceURI, "text");
+      t.setAttribute("class", "endlabel");
+      t.setAttribute("x", cx); t.setAttribute("y", y + dy);
+      t.setAttribute("text-anchor", "middle");
+      t.textContent = d.fmt(val);
+      svg.appendChild(t);
+    });
+
+    card.appendChild(svg);
+
+    var improvedGood = d.after > d.before ? (d.after / d.before - 1) * 100 : (1 - d.after / d.before) * 100;
+    var direction = d.after > d.before ? "up" : "down";
+    var caption = document.createElement("div");
+    caption.className = "caption";
+    var up = document.createElement("span");
+    up.className = "up";
+    up.textContent = (direction === "up" ? "↑ " : "↓ ") + improvedGood.toFixed(0) + "%";
+    caption.appendChild(up);
+    caption.appendChild(document.createTextNode(" " + (direction === "up" ? "increase" : "reduction")));
+    card.appendChild(caption);
+
+    grid.appendChild(card);
+  });
+
+  // ---- Meter bars ----
+  var meters = [
+    { name: "NCCL alltoall", sub: "avg busbw, 23.0 → 14.2 GB/s", pct: 38.1 },
+    { name: "NCCL all_reduce", sub: "avg busbw, 50.3 → 32.5 GB/s", pct: 35.4 },
+    { name: "NCCL all_gather", sub: "avg busbw, 49.0 → 32.2 GB/s", pct: 34.3 },
+    { name: "Device↔device read", sub: "nvbandwidth SUM, 3213.7 → 2467.2 GB/s", pct: 23.2 }
+  ];
+  var METER_MAX = 40;
+  var list = document.getElementById("meter-list");
+  meters.forEach(function (m) {
+    var row = document.createElement("div");
+    row.className = "meter-row";
+
+    var name = document.createElement("div");
+    name.className = "name";
+    var strong = document.createElement("span");
+    strong.textContent = m.name;
+    var small = document.createElement("small");
+    small.textContent = m.sub;
+    name.appendChild(strong);
+    name.appendChild(small);
+
+    var trackEl = document.createElement("div");
+    trackEl.className = "meter-track";
+    var fillEl = document.createElement("div");
+    fillEl.className = "meter-fill";
+    fillEl.style.width = Math.min(100, (m.pct / METER_MAX) * 100) + "%";
+    trackEl.appendChild(fillEl);
+    wireTip(fillEl, m.name + ": −" + m.pct.toFixed(1) + "%");
+
+    var value = document.createElement("div");
+    value.className = "value";
+    value.textContent = "−" + m.pct.toFixed(1) + "%";
+
+    row.appendChild(name);
+    row.appendChild(trackEl);
+    row.appendChild(value);
+    list.appendChild(row);
+  });
+})();
+</script>
+</body>
+</html>

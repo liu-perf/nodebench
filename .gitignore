@@ -10,6 +10,12 @@ raw/
 *.html
 !examples/*.html
 !nodebench/report/templates/*.html
+# docs/dashboard.html is the hand-written summary dashboard linked from docs/index.md.
+# It is NOT a run report: it is self-contained, carries no machine label, no driver
+# version, no timestamp and no hostname -- checked before adding this line. Without
+# this exemption the global *.html rule swallows it silently, and the link on the
+# published Pages site 404s. (Same failure shape as the `traces/` rule in prefixkv.)
+!docs/dashboard.html
 
 # native toolchain (cloned + built by `nodebench setup --native`)
 third_party/
